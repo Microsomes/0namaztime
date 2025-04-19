@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { format } from "date-fns"
-import { Calendar, Clock, Moon, RefreshCw, Sun, Volume2 } from "lucide-react"
+import { Calendar, Clock, Moon, RefreshCw, Sun, Volume2, Maximize, Minimize } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useTheme } from "next-themes"
@@ -11,6 +11,7 @@ import { AdhanPermission } from "@/components/adhan-permission"
 import { PrayerCard } from "@/components/prayer-card"
 import adhanService from "@/services/adhan-service"
 import { useToast } from "@/components/ui/use-toast"
+import moment from "moment-hijri"
 
 interface Prayer {
   name: string
@@ -26,6 +27,7 @@ export default function Home() {
   const [currentTime, setCurrentTime] = useState(new Date())
   const [adhanPermission, setAdhanPermission] = useState<"unknown" | "granted" | "denied">("unknown")
   const [testingAdhan, setTestingAdhan] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const { setTheme, theme } = useTheme()
   const { toast } = useToast()
 
@@ -109,6 +111,10 @@ export default function Home() {
     const now = new Date()
     const currentHour = now.getHours()
     const currentMinute = now.getMinutes()
+    const currentSeconds = now.getSeconds()
+
+    // Only check in the first 5 seconds of each minute to avoid multiple triggers
+    if (currentSeconds > 5) return
 
     // Check each prayer time
     for (const prayer of prayers) {
@@ -119,11 +125,20 @@ export default function Home() {
 
       // Check if it's exactly prayer time
       if (currentHour === prayerHour && currentMinute === prayerMinute) {
-        adhanService.playAdhan(prayer.name)
+        // Check if adhan is not already playing to avoid multiple plays
+        if (!adhanService.isPlaying()) {
+          console.log(`Prayer time: ${prayer.name} - Playing adhan automatically`)
+          adhanService.playAdhan(prayer.name)
+          
+          toast({
+            title: "Prayer Time",
+            description: `It's time for ${prayer.name} prayer.`,
+          })
+        }
         break
       }
     }
-  }, [currentTime, prayerTimes, adhanPermission])
+  }, [currentTime, prayerTimes, adhanPermission, toast])
 
   const getHoursMinutes = (timeStr: string): [number, number] => {
     // Handle 12-hour format (e.g., "6:30 AM")
@@ -309,6 +324,20 @@ export default function Home() {
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark")
   }
+  
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+      setIsFullscreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+        setIsFullscreen(false);
+      }
+    }
+  }
 
   const handleAdhanPermissionGranted = () => {
     setAdhanPermission("granted")
@@ -354,6 +383,9 @@ export default function Home() {
 
   const { current: currentPrayer, next: nextPrayer } = getCurrentAndNextPrayer()
 
+  // Get the Hijri date using moment-hijri
+  const hijriDate = moment().format('iDD iMMMM iYYYY');
+  
   return (
     <main className="flex min-h-screen flex-col items-center p-4 bg-background">
       <AdhanPermission
@@ -371,13 +403,15 @@ export default function Home() {
                 <span>{prayerTimes.date}</span>
               </div>
             )}
-            {prayerTimes && prayerTimes.hijriDate && prayerTimes.hijriDate !== "Hijri date not available" && (
-              <div className="flex items-center text-sm text-muted-foreground">
-                <span className="italic">{prayerTimes.hijriDate}</span>
-              </div>
-            )}
+            {/* Always show Hijri date regardless of mosque API response */}
+            <div className="flex items-center text-sm text-muted-foreground">
+              <span className="italic">{hijriDate} AH</span>
+            </div>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" size="icon" onClick={toggleFullscreen} className="h-9 w-9">
+              {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+            </Button>
             <Button variant="outline" size="icon" onClick={toggleTheme} className="h-9 w-9">
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
@@ -438,43 +472,163 @@ export default function Home() {
           </div>
         ) : (
           prayerTimes && (
-            <div className="grid grid-cols-2 gap-4">
-              <PrayerCard
-                name="Fajr"
-                time={formatTime(prayerTimes.Fajr)}
-                isCurrent={currentPrayer?.name === "Fajr" || currentPrayer?.name === "Fajr (Yesterday)"}
-                isNext={nextPrayer?.name === "Fajr" || nextPrayer?.name === "Fajr (Tomorrow)"}
-              />
-              <PrayerCard
-                name="Sunrise"
-                time={formatTime(prayerTimes.Sunrise)}
-                isCurrent={currentPrayer?.name === "Sunrise"}
-                isNext={nextPrayer?.name === "Sunrise"}
-              />
-              <PrayerCard
-                name="Dhuhr"
-                time={formatTime(prayerTimes.Zuhr)} // Note: Using Zuhr from mosque
-                isCurrent={currentPrayer?.name === "Dhuhr"}
-                isNext={nextPrayer?.name === "Dhuhr"}
-              />
-              <PrayerCard
-                name="Asr"
-                time={formatTime(prayerTimes.Asr)}
-                isCurrent={currentPrayer?.name === "Asr"}
-                isNext={nextPrayer?.name === "Asr"}
-              />
-              <PrayerCard
-                name="Maghrib"
-                time={formatTime(prayerTimes.Maghrib)}
-                isCurrent={currentPrayer?.name === "Maghrib"}
-                isNext={nextPrayer?.name === "Maghrib"}
-              />
-              <PrayerCard
-                name="Isha"
-                time={formatTime(prayerTimes.Isha)}
-                isCurrent={currentPrayer?.name === "Isha" || currentPrayer?.name === "Isha (Yesterday)"}
-                isNext={nextPrayer?.name === "Isha" || nextPrayer?.name === "Isha (Tomorrow)"}
-              />
+            <div className="flex flex-col gap-4">
+              {/* Current Prayer - Full Width */}
+              {currentPrayer && (
+                <div className="w-full">
+                  {currentPrayer.name === "Fajr" || currentPrayer.name === "Fajr (Yesterday)" ? (
+                    <PrayerCard
+                      name="Fajr"
+                      time={formatTime(prayerTimes.Fajr)}
+                      isCurrent={true}
+                      isNext={false}
+                    />
+                  ) : currentPrayer.name === "Sunrise" ? (
+                    <PrayerCard
+                      name="Sunrise"
+                      time={formatTime(prayerTimes.Sunrise)}
+                      isCurrent={true}
+                      isNext={false}
+                    />
+                  ) : currentPrayer.name === "Dhuhr" ? (
+                    <PrayerCard
+                      name="Dhuhr"
+                      time={formatTime(prayerTimes.Zuhr)}
+                      isCurrent={true}
+                      isNext={false}
+                    />
+                  ) : currentPrayer.name === "Asr" ? (
+                    <PrayerCard
+                      name="Asr"
+                      time={formatTime(prayerTimes.Asr)}
+                      isCurrent={true}
+                      isNext={false}
+                    />
+                  ) : currentPrayer.name === "Maghrib" ? (
+                    <PrayerCard
+                      name="Maghrib"
+                      time={formatTime(prayerTimes.Maghrib)}
+                      isCurrent={true}
+                      isNext={false}
+                    />
+                  ) : (
+                    <PrayerCard
+                      name="Isha"
+                      time={formatTime(prayerTimes.Isha)}
+                      isCurrent={true}
+                      isNext={false}
+                    />
+                  )}
+                </div>
+              )}
+              
+              {/* Next Prayer - Full Width */}
+              {nextPrayer && (
+                <div className="w-full">
+                  {nextPrayer.name === "Fajr" || nextPrayer.name === "Fajr (Tomorrow)" ? (
+                    <PrayerCard
+                      name="Fajr"
+                      time={formatTime(prayerTimes.Fajr)}
+                      isCurrent={false}
+                      isNext={true}
+                    />
+                  ) : nextPrayer.name === "Sunrise" ? (
+                    <PrayerCard
+                      name="Sunrise"
+                      time={formatTime(prayerTimes.Sunrise)}
+                      isCurrent={false}
+                      isNext={true}
+                    />
+                  ) : nextPrayer.name === "Dhuhr" ? (
+                    <PrayerCard
+                      name="Dhuhr"
+                      time={formatTime(prayerTimes.Zuhr)}
+                      isCurrent={false}
+                      isNext={true}
+                    />
+                  ) : nextPrayer.name === "Asr" ? (
+                    <PrayerCard
+                      name="Asr"
+                      time={formatTime(prayerTimes.Asr)}
+                      isCurrent={false}
+                      isNext={true}
+                    />
+                  ) : nextPrayer.name === "Maghrib" ? (
+                    <PrayerCard
+                      name="Maghrib"
+                      time={formatTime(prayerTimes.Maghrib)}
+                      isCurrent={false}
+                      isNext={true}
+                    />
+                  ) : (
+                    <PrayerCard
+                      name="Isha"
+                      time={formatTime(prayerTimes.Isha)}
+                      isCurrent={false}
+                      isNext={true}
+                    />
+                  )}
+                </div>
+              )}
+              
+              {/* Remaining Prayers - Grid Layout */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {(currentPrayer?.name !== "Fajr" && currentPrayer?.name !== "Fajr (Yesterday)" && 
+                  nextPrayer?.name !== "Fajr" && nextPrayer?.name !== "Fajr (Tomorrow)") && (
+                  <PrayerCard
+                    name="Fajr"
+                    time={formatTime(prayerTimes.Fajr)}
+                    isCurrent={false}
+                    isNext={false}
+                  />
+                )}
+                
+                {currentPrayer?.name !== "Sunrise" && nextPrayer?.name !== "Sunrise" && (
+                  <PrayerCard
+                    name="Sunrise"
+                    time={formatTime(prayerTimes.Sunrise)}
+                    isCurrent={false}
+                    isNext={false}
+                  />
+                )}
+                
+                {currentPrayer?.name !== "Dhuhr" && nextPrayer?.name !== "Dhuhr" && (
+                  <PrayerCard
+                    name="Dhuhr"
+                    time={formatTime(prayerTimes.Zuhr)}
+                    isCurrent={false}
+                    isNext={false}
+                  />
+                )}
+                
+                {currentPrayer?.name !== "Asr" && nextPrayer?.name !== "Asr" && (
+                  <PrayerCard
+                    name="Asr"
+                    time={formatTime(prayerTimes.Asr)}
+                    isCurrent={false}
+                    isNext={false}
+                  />
+                )}
+                
+                {currentPrayer?.name !== "Maghrib" && nextPrayer?.name !== "Maghrib" && (
+                  <PrayerCard
+                    name="Maghrib"
+                    time={formatTime(prayerTimes.Maghrib)}
+                    isCurrent={false}
+                    isNext={false}
+                  />
+                )}
+                
+                {(currentPrayer?.name !== "Isha" && currentPrayer?.name !== "Isha (Yesterday)" && 
+                  nextPrayer?.name !== "Isha" && nextPrayer?.name !== "Isha (Tomorrow)") && (
+                  <PrayerCard
+                    name="Isha"
+                    time={formatTime(prayerTimes.Isha)}
+                    isCurrent={false}
+                    isNext={false}
+                  />
+                )}
+              </div>
             </div>
           )
         )}

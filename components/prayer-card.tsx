@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
-import { Volume2, VolumeX, Play, AlertCircle } from "lucide-react"
+import { Volume2, VolumeX, Play, AlertCircle, Square } from "lucide-react"
 import adhanService from "@/services/adhan-service"
 import { useToast } from "@/components/ui/use-toast"
 
@@ -15,9 +15,14 @@ interface PrayerCardProps {
 
 export function PrayerCard({ name, time, isCurrent, isNext }: PrayerCardProps) {
   const [adhanEnabled, setAdhanEnabled] = useState(false)
-  const [isPlaying, setIsPlaying] = useState(false)
+  const [isPlayingLocal, setIsPlayingLocal] = useState(false)
   const [playError, setPlayError] = useState(false)
   const { toast } = useToast()
+
+  // Compute if this prayer is currently playing
+  const isPlaying = adhanService.isPlaying() && 
+    (adhanService.getCurrentlyPlayingPrayer() === name || 
+     adhanService.getCurrentlyPlayingPrayer() === adhanService.normalizePrayerName(name))
 
   useEffect(() => {
     // Initialize from the service
@@ -26,6 +31,7 @@ export function PrayerCard({ name, time, isCurrent, isNext }: PrayerCardProps) {
 
   let headerClass = "bg-muted text-muted-foreground"
   let borderClass = ""
+  let cardSize = isCurrent || isNext ? "large" : "small"
 
   if (isCurrent) {
     headerClass = "bg-amber-600 text-white"
@@ -41,9 +47,9 @@ export function PrayerCard({ name, time, isCurrent, isNext }: PrayerCardProps) {
   }
 
   const playAdhan = async () => {
-    if (isPlaying) return
+    if (adhanService.isPlaying()) return
 
-    setIsPlaying(true)
+    setIsPlayingLocal(true)
     setPlayError(false)
 
     try {
@@ -66,59 +72,68 @@ export function PrayerCard({ name, time, isCurrent, isNext }: PrayerCardProps) {
         description: "An error occurred while playing the adhan.",
         variant: "destructive",
       })
+    } finally {
+      setIsPlayingLocal(false)
     }
-
-    // Set a timeout to reset the playing state after a few seconds
-    // This is a fallback in case the 'ended' event doesn't fire
-    setTimeout(() => {
-      if (adhanService.isPlaying()) {
-        // Still playing according to the service
-      } else {
-        setIsPlaying(false)
-      }
-    }, 3000)
   }
 
-  // Check if adhan is still playing
-  useEffect(() => {
-    const checkInterval = setInterval(() => {
-      if (isPlaying && !adhanService.isPlaying()) {
-        setIsPlaying(false)
-      }
-    }, 1000)
+  const stopAdhan = () => {
+    adhanService.stopAdhan()
+  }
 
-    return () => clearInterval(checkInterval)
-  }, [isPlaying])
+  // Subscribe to adhan service state changes
+  useEffect(() => {
+    // Subscribe to changes in the adhan service
+    const unsubscribe = adhanService.subscribe(() => {
+      // Force re-render when adhan service state changes
+      setIsPlayingLocal(prev => !prev)
+    })
+
+    // Cleanup subscription when component unmounts
+    return () => unsubscribe()
+  }, [])
 
   return (
-    <Card className={`overflow-hidden ${borderClass}`}>
+    <Card className={`overflow-hidden ${borderClass} ${cardSize === "large" ? "col-span-2" : ""}`}>
       <CardContent className="p-0">
         <div className={`p-2 ${headerClass} flex justify-between items-center`}>
-          <h3 className="font-medium text-center flex-1">{name}</h3>
-          <div className="flex items-center">
-            <button
-              onClick={playAdhan}
-              className="p-1 rounded-full hover:bg-white/20 transition-colors mr-1"
-              aria-label="Play adhan for this prayer"
-              disabled={isPlaying}
-            >
-              {playError ? (
-                <AlertCircle className="h-4 w-4 text-red-500" />
+          <h3 className={`font-medium text-center flex-1 ${cardSize === "large" ? "text-lg" : ""}`}>{name}</h3>
+          {(isCurrent || isNext) && (
+            <div className="flex items-center">
+              {isPlaying ? (
+                <button
+                  onClick={stopAdhan}
+                  className="p-1 rounded-full hover:bg-white/20 transition-colors mr-1"
+                  aria-label="Stop adhan"
+                >
+                  <Square className="h-4 w-4" />
+                </button>
               ) : (
-                <Play className={`h-4 w-4 ${isPlaying ? "opacity-50" : ""}`} />
+                <button
+                  onClick={playAdhan}
+                  className="p-1 rounded-full hover:bg-white/20 transition-colors mr-1"
+                  aria-label="Play adhan for this prayer"
+                  disabled={isPlaying}
+                >
+                  {playError ? (
+                    <AlertCircle className="h-4 w-4 text-red-500" />
+                  ) : (
+                    <Play className="h-4 w-4" />
+                  )}
+                </button>
               )}
-            </button>
-            <button
-              onClick={toggleAdhan}
-              className="p-1 rounded-full hover:bg-white/20 transition-colors"
-              aria-label={adhanEnabled ? "Disable adhan for this prayer" : "Enable adhan for this prayer"}
-            >
-              {adhanEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-            </button>
-          </div>
+              <button
+                onClick={toggleAdhan}
+                className="p-1 rounded-full hover:bg-white/20 transition-colors"
+                aria-label={adhanEnabled ? "Disable adhan for this prayer" : "Enable adhan for this prayer"}
+              >
+                {adhanEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+              </button>
+            </div>
+          )}
         </div>
-        <div className="p-4 flex justify-center items-center">
-          <span className="text-2xl font-bold">{time}</span>
+        <div className={`p-4 flex justify-center items-center ${cardSize === "large" ? "py-8" : ""}`}>
+          <span className={`font-bold ${cardSize === "large" ? "text-4xl" : "text-xl"}`}>{time}</span>
         </div>
         {isCurrent && (
           <div className="bg-amber-600/20 text-amber-600 text-xs text-center py-1 font-medium">Current</div>

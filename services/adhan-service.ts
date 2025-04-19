@@ -6,11 +6,24 @@ class AdhanService {
   private lastPlayedDate: string | null = null
   private isCurrentlyPlaying = false
   private audioLoaded = false
+  private listeners: Set<() => void> = new Set()
 
   constructor() {
     if (typeof window !== "undefined") {
       this.loadSettings()
     }
+  }
+
+  // Event emitter methods
+  subscribe(listener: () => void) {
+    this.listeners.add(listener)
+    return () => {
+      this.listeners.delete(listener)
+    }
+  }
+
+  private notifyListeners() {
+    this.listeners.forEach(listener => listener())
   }
 
   initialize() {
@@ -35,6 +48,8 @@ class AdhanService {
       this.adhanAudio.addEventListener("ended", () => {
         console.log("Adhan playback ended")
         this.isCurrentlyPlaying = false
+        this.lastPlayedPrayer = null
+        this.notifyListeners()
       })
 
       // Set audio properties
@@ -110,11 +125,15 @@ class AdhanService {
   }
 
   isPrayerEnabled(prayerName: string): boolean {
-    return this.prayerSettings[prayerName] || false
+    // Normalize Dhuhr/Zuhr naming variants
+    const normalizedName = this.normalizePrayerName(prayerName)
+    return this.prayerSettings[normalizedName] || false
   }
 
   togglePrayer(prayerName: string) {
-    this.prayerSettings[prayerName] = !this.isPrayerEnabled(prayerName)
+    // Normalize Dhuhr/Zuhr naming variants
+    const normalizedName = this.normalizePrayerName(prayerName)
+    this.prayerSettings[normalizedName] = !this.isPrayerEnabled(prayerName)
     this.saveSettings()
     return this.isPrayerEnabled(prayerName)
   }
@@ -124,20 +143,23 @@ class AdhanService {
       return false
     }
 
+    // Normalize prayer name
+    const normalizedName = this.normalizePrayerName(prayerName);
+
     // For manual play, we only check if the service is initialized
     if (isManualPlay) {
       return true
     }
 
     // For automatic play, we check if the prayer is enabled
-    if (!this.isPrayerEnabled(prayerName)) {
+    if (!this.isPrayerEnabled(normalizedName)) {
       return false
     }
 
     const today = new Date().toISOString().split("T")[0]
 
     // Don't play if we've already played this prayer today
-    if (this.lastPlayedPrayer === prayerName && this.lastPlayedDate === today) {
+    if (this.lastPlayedPrayer === normalizedName && this.lastPlayedDate === today) {
       return false
     }
 
@@ -146,6 +168,10 @@ class AdhanService {
 
   async playAdhan(prayerName: string, isManualPlay = false): Promise<boolean> {
     console.log(`Attempting to play adhan for ${prayerName}, manual: ${isManualPlay}`)
+    
+    // Normalize the prayer name
+    const normalizedName = this.normalizePrayerName(prayerName);
+    console.log(`Normalized prayer name: ${normalizedName}`);
 
     if (!this.initialized || !this.adhanAudio) {
       console.log("Adhan service not initialized, initializing now")
@@ -157,7 +183,7 @@ class AdhanService {
       return false
     }
 
-    if (!this.shouldPlayAdhan(prayerName, isManualPlay)) {
+    if (!this.shouldPlayAdhan(normalizedName, isManualPlay)) {
       console.log("Should not play adhan for this prayer")
       return false
     }
@@ -184,6 +210,8 @@ class AdhanService {
 
       console.log("Playing adhan...")
       this.isCurrentlyPlaying = true
+      this.lastPlayedPrayer = normalizedName // Always set the currently playing prayer
+      this.notifyListeners() // Notify listeners about state change
 
       // Play the adhan
       try {
@@ -192,16 +220,17 @@ class AdhanService {
       } catch (playError) {
         console.error("Error playing adhan:", playError)
         this.isCurrentlyPlaying = false
+        this.lastPlayedPrayer = null
+        this.notifyListeners() // Notify listeners about state change
         return false
       }
 
-      // Only record automatic plays (not manual ones)
+      // Only record automatic plays (not manual ones) in localStorage
       if (!isManualPlay) {
         // Record that we played this prayer today
         const today = new Date().toISOString().split("T")[0]
-        this.lastPlayedPrayer = prayerName
         this.lastPlayedDate = today
-        localStorage.setItem("lastPlayedPrayer", prayerName)
+        localStorage.setItem("lastPlayedPrayer", normalizedName)
         localStorage.setItem("lastPlayedDate", today)
       }
 
@@ -209,20 +238,36 @@ class AdhanService {
     } catch (error) {
       console.error("Error in playAdhan:", error)
       this.isCurrentlyPlaying = false
+      this.lastPlayedPrayer = null
+      this.notifyListeners() // Notify listeners about state change
       return false
     }
   }
 
   stopAdhan() {
+    console.log("Stopping adhan playback")
     if (this.adhanAudio) {
       this.adhanAudio.pause()
       this.adhanAudio.currentTime = 0
       this.isCurrentlyPlaying = false
+      this.lastPlayedPrayer = null
+      this.notifyListeners() // Notify listeners about state change
+      console.log("Adhan playback stopped")
     }
   }
 
   isPlaying(): boolean {
     return this.isCurrentlyPlaying
+  }
+  
+  getCurrentlyPlayingPrayer(): string | null {
+    return this.isCurrentlyPlaying ? this.lastPlayedPrayer : null
+  }
+  
+  // Normalize prayer names to handle variants like Zuhr/Dhuhr
+  normalizePrayerName(prayerName: string): string {
+    if (prayerName === "Zuhr") return "Dhuhr";
+    return prayerName;
   }
 
   timeToDate(timeStr: string, today = new Date()): Date {
