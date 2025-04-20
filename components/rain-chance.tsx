@@ -1,13 +1,14 @@
 "use client"
 
 import { Card, CardContent } from "@/components/ui/card"
-import { WiRaindrop, WiUmbrella, WiSunset } from "react-icons/wi"
+import { WiRaindrop, WiUmbrella, WiSunset, WiTime4 } from "react-icons/wi"
 
 interface RainChanceProps {
-  rainChance: number
+  rainChance: number;
+  likelyRainTime: string;
 }
 
-export function RainChance({ rainChance }: RainChanceProps) {
+export function RainChance({ rainChance, likelyRainTime }: RainChanceProps) {
   // Color based on rain chance
   const getColor = () => {
     if (rainChance < 20) return "text-green-500"
@@ -54,6 +55,12 @@ export function RainChance({ rainChance }: RainChanceProps) {
             <div className="text-xs text-muted-foreground animate-fade-in" style={{animationDelay: "0.5s"}}>
               {getMessage()}
             </div>
+            {rainChance >= 30 && (
+              <div className="flex items-center justify-center mt-1 text-2xs text-muted-foreground animate-fade-in" style={{animationDelay: "0.6s"}}>
+                <WiTime4 className="h-3 w-3 mr-1" />
+                {likelyRainTime}
+              </div>
+            )}
           </div>
         </div>
       </CardContent>

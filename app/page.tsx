@@ -636,7 +636,10 @@ export default function Home() {
                 <WeatherCard weatherData={weatherData} />
               </div>
               <div className="col-span-1">
-                <RainChance rainChance={weatherData.rainChance} />
+                <RainChance 
+                  rainChance={weatherData.rainChance}
+                  likelyRainTime={weatherData.likelyRainTime}
+                />
               </div>
             </div>
           ) : (
