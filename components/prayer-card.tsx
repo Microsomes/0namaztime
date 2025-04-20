@@ -103,50 +103,43 @@ export function PrayerCard({ name, time, isCurrent, isNext }: PrayerCardProps) {
   return (
     <Card className={`overflow-hidden ${borderClass} ${animationClass} ${currentClass}`}>
       <CardContent className="p-0">
-        <div className={`p-2 ${headerClass} flex justify-between items-center`}>
-          <h3 className={`font-medium text-center flex-1 ${cardSize === "large" ? "text-lg" : ""}`}>{name}</h3>
+        <div className={`p-1 ${headerClass} flex justify-between items-center`}>
+          <h3 className={`font-medium text-center flex-1 ${cardSize === "large" ? "text-base" : "text-xs"}`}>{name}</h3>
           {(isCurrent || isNext) && (
             <div className="flex items-center">
               {isPlaying ? (
                 <button
                   onClick={stopAdhan}
-                  className="p-1 rounded-full hover:bg-white/20 transition-colors mr-1 animate-pulse"
+                  className="p-1 rounded-full hover:bg-white/20 transition-colors animate-pulse"
                   aria-label="Stop adhan"
                 >
-                  <Square className="h-4 w-4" />
+                  <Square className="h-3 w-3" />
                 </button>
               ) : (
                 <button
                   onClick={playAdhan}
-                  className="p-1 rounded-full hover:bg-white/20 transition-colors mr-1"
+                  className="p-1 rounded-full hover:bg-white/20 transition-colors"
                   aria-label="Play adhan for this prayer"
                   disabled={isPlaying}
                 >
                   {playError ? (
-                    <AlertCircle className="h-4 w-4 text-red-500 animate-pulse" />
+                    <AlertCircle className="h-3 w-3 text-red-500 animate-pulse" />
                   ) : (
-                    <Play className="h-4 w-4" />
+                    <Play className="h-3 w-3" />
                   )}
                 </button>
               )}
-              <button
-                onClick={toggleAdhan}
-                className="p-1 rounded-full hover:bg-white/20 transition-colors"
-                aria-label={adhanEnabled ? "Disable adhan for this prayer" : "Enable adhan for this prayer"}
-              >
-                {adhanEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-              </button>
             </div>
           )}
         </div>
-        <div className={`p-4 flex justify-center items-center ${cardSize === "large" ? "py-8" : ""}`}>
-          <span className={`font-bold ${cardSize === "large" ? "text-4xl" : "text-xl"}`}>{time}</span>
+        <div className={`p-2 flex justify-center items-center ${cardSize === "large" ? "py-4" : ""}`}>
+          <span className={`font-bold ${cardSize === "large" ? "text-2xl" : "text-lg"}`}>{time}</span>
         </div>
         {isCurrent && (
-          <div className="bg-amber-600/20 text-amber-600 text-xs text-center py-1 font-medium animate-pulse">Current</div>
+          <div className="bg-amber-600/20 text-amber-600 text-2xs text-center py-1 font-medium animate-pulse">Current</div>
         )}
         {isNext && !isCurrent && (
-          <div className="bg-primary/20 text-primary text-xs text-center py-1 font-medium animate-shimmer">Next</div>
+          <div className="bg-primary/20 text-primary text-2xs text-center py-1 font-medium animate-shimmer">Next</div>
         )}
       </CardContent>
     </Card>

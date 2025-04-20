@@ -542,73 +542,76 @@ export default function Home() {
   
   
   return (
-    <main className="flex min-h-screen flex-col items-center p-4 bg-background animate-fade-in">
+    <main className="flex min-h-screen flex-col items-stretch p-2 bg-background animate-fade-in">
+      {/* Tablet-optimized container for 7-inch portrait display */}
       <AdhanPermission
         onPermissionGranted={handleAdhanPermissionGranted}
         onPermissionDenied={handleAdhanPermissionDenied}
       />
 
-      <div className="w-full max-w-md mx-auto">
-        <div className="flex justify-between items-center mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Birmingham Central Mosque</h1>
-            {prayerTimes && (
-              <div className="flex items-center text-sm text-muted-foreground mt-1">
-                <Calendar className="h-4 w-4 mr-1" />
-                <span>{prayerTimes.date}</span>
+      <div className="w-full mx-auto flex flex-col h-full">
+        {/* Header area - more compact for tablet */}
+        <div className="flex justify-between items-center mb-2">
+          <div className="flex-1">
+            <h1 className="text-lg font-bold text-foreground leading-tight">Birmingham Central Mosque</h1>
+            <div className="flex items-center justify-between">
+              {prayerTimes && (
+                <div className="flex items-center text-xs text-muted-foreground">
+                  <Calendar className="h-3 w-3 mr-1" />
+                  <span>{prayerTimes.date}</span>
+                </div>
+              )}
+              <div className="flex items-center text-xs text-muted-foreground ml-2">
+                <span className="italic">{hijriDate} AH</span>
               </div>
-            )}
-            {/* Always show Hijri date regardless of mosque API response */}
-            <div className="flex items-center text-sm text-muted-foreground">
-              <span className="italic">{hijriDate} AH</span>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="icon" onClick={toggleFullscreen} className="h-9 w-9">
-              {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+          <div className="flex gap-1">
+            <Button variant="outline" size="icon" onClick={toggleFullscreen} className="h-8 w-8">
+              {isFullscreen ? <Minimize className="h-3 w-3" /> : <Maximize className="h-3 w-3" />}
             </Button>
-            <Button variant="outline" size="icon" onClick={toggleTheme} className="h-9 w-9">
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            <Button variant="outline" size="icon" onClick={toggleTheme} className="h-8 w-8">
+              {theme === "dark" ? <Sun className="h-3 w-3" /> : <Moon className="h-3 w-3" />}
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={fetchPrayerTimes}
               disabled={loading}
-              className="flex items-center gap-1 h-9"
+              className="flex items-center gap-1 h-8 text-xs"
             >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
               Refresh
             </Button>
           </div>
         </div>
 
         {adhanPermission === "granted" && (
-          <div className="mb-4 flex justify-center">
+          <div className="mb-2 flex justify-end">
             <Button
               variant="outline"
               size="sm"
               onClick={testAdhanSound}
               disabled={testingAdhan}
-              className="flex items-center gap-1"
+              className="flex items-center gap-1 h-7 text-xs"
             >
-              <Volume2 className="h-4 w-4" />
-              {testingAdhan ? "Testing..." : "Test Adhan Sound"}
+              <Volume2 className="h-3 w-3" />
+              {testingAdhan ? "Testing..." : "Test Sound"}
             </Button>
           </div>
         )}
 
         {nextPrayer && (
-          <Card className="mb-4 border-primary animate-scale-in">
-            <CardContent className="p-4 animate-shimmer">
+          <Card className="mb-2 border-primary animate-scale-in">
+            <CardContent className="p-2 animate-shimmer">
               <div className="flex justify-between items-center">
                 <div className="animate-fade-in" style={{animationDelay: "0.1s"}}>
-                  <h3 className="text-lg font-medium text-foreground">Next Prayer</h3>
-                  <p className="text-2xl font-bold text-primary">{nextPrayer.name}</p>
+                  <h3 className="text-xs uppercase tracking-wide font-medium text-foreground">Next Prayer</h3>
+                  <p className="text-xl font-bold text-primary leading-tight">{nextPrayer.name}</p>
                 </div>
                 <div className="text-right animate-fade-in" style={{animationDelay: "0.2s"}}>
-                  <p className="text-sm text-muted-foreground">Time until</p>
-                  <p className="text-2xl font-bold text-primary animate-pulse">{getTimeUntilNextPrayer()}</p>
+                  <p className="text-xs text-muted-foreground">Time until</p>
+                  <p className="text-xl font-bold text-primary animate-pulse leading-tight">{getTimeUntilNextPrayer()}</p>
                 </div>
               </div>
             </CardContent>
@@ -621,37 +624,40 @@ export default function Home() {
           </div>
         )}
 
-        {/* Weather Card - Above prayer times */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-          <div className="lg:col-span-3">
-            {weatherLoading ? (
-              <div className="flex justify-center items-center h-20">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+        {/* Weather Card - More compact for tablet */}
+        <div className="grid grid-cols-1 gap-2 mb-2">
+          {weatherLoading ? (
+            <div className="flex justify-center items-center h-16">
+              <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          ) : weatherData ? (
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-2">
+                <WeatherCard weatherData={weatherData} />
               </div>
-            ) : weatherData ? (
-              <WeatherCard weatherData={weatherData} />
-            ) : (
-              <Card>
-                <CardContent className="p-4 flex items-center justify-center">
-                  <Cloud className="h-5 w-5 mr-2 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Weather data unavailable</span>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-          
-          
+              <div className="col-span-1">
+                <RainChance rainChance={weatherData.rainChance} />
+              </div>
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-2 flex items-center justify-center">
+                <Cloud className="h-4 w-4 mr-1 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Weather data unavailable</span>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          <div className="flex justify-center items-center h-24">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
           </div>
         ) : (
           prayerTimes && (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
               {/* Current and Next Prayers - Side by Side */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-2">
                 {/* Current Prayer */}
                 {currentPrayer && (
                   <div className="w-full">
@@ -752,7 +758,7 @@ export default function Home() {
               </div>
               
               {/* Remaining Prayers - Grid Layout */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-2">
                 {(currentPrayer?.name !== "Fajr" && currentPrayer?.name !== "Fajr (Yesterday)" && 
                   nextPrayer?.name !== "Fajr" && nextPrayer?.name !== "Fajr (Tomorrow)") && (
                   <PrayerCard
@@ -814,10 +820,10 @@ export default function Home() {
         )}
 
         {lastUpdated && (
-          <div className="text-xs text-muted-foreground mt-4 text-center flex items-center justify-center animate-fade-in">
-            <Clock className="h-3 w-3 mr-1" />
+          <div className="text-2xs text-muted-foreground mt-2 text-center flex items-center justify-center animate-fade-in">
+            <Clock className="h-2 w-2 mr-1" />
             Last updated: {format(lastUpdated, "HH:mm")} 
-            <span className="ml-1 opacity-70">(auto-refreshes hourly)</span>
+            <span className="ml-1 opacity-70">(auto-refresh)</span>
           </div>
         )}
       </div>

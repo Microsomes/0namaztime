@@ -13,10 +13,23 @@ const config = {
   theme: {
     container: {
       center: true,
-      padding: "2rem",
+      padding: "1rem",
       screens: {
         "2xl": "1400px",
       },
+    },
+    fontSize: {
+      '2xs': '0.625rem',
+      xs: '0.75rem',
+      sm: '0.8rem',
+      base: '0.875rem',
+      lg: '1rem',
+      xl: '1.125rem',
+      '2xl': '1.25rem',
+      '3xl': '1.5rem',
+      '4xl': '1.875rem',
+      '5xl': '2.25rem',
+      '6xl': '3rem',
     },
     extend: {
       colors: {

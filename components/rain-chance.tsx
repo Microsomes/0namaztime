@@ -41,17 +41,17 @@ export function RainChance({ rainChance }: RainChanceProps) {
   const iconClass = rainChance > 50 ? "animate-float" : "animate-pulse";
   
   return (
-    <Card className="mb-4 animate-fade-in" style={{animationDelay: "0.3s"}}>
-      <CardContent className={`p-4 flex items-center justify-between ${rainChance > 50 ? "weather-rain" : ""}`}>
-        <div className="flex items-center">
+    <Card className="mb-4 animate-fade-in h-full" style={{animationDelay: "0.3s"}}>
+      <CardContent className={`p-2 flex items-center justify-center ${rainChance > 50 ? "weather-rain" : ""}`}>
+        <div className="flex flex-col items-center">
           <div className={iconClass}>
             {getIcon()}
           </div>
-          <div className="ml-3">
-            <div className={`text-lg font-medium ${getColor()} animate-fade-in`} style={{animationDelay: "0.4s"}}>
-              {rainChance}% Chance of Rain
+          <div className="text-center">
+            <div className={`text-base font-medium ${getColor()} animate-fade-in`} style={{animationDelay: "0.4s"}}>
+              {rainChance}%
             </div>
-            <div className="text-sm text-muted-foreground animate-fade-in" style={{animationDelay: "0.5s"}}>
+            <div className="text-xs text-muted-foreground animate-fade-in" style={{animationDelay: "0.5s"}}>
               {getMessage()}
             </div>
           </div>

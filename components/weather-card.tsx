@@ -52,38 +52,38 @@ export function WeatherCard({ weatherData }: WeatherCardProps) {
     
   return (
     <Card className={cardClass}>
-      <CardContent className="p-4">
+      <CardContent className="p-2">
         <div className="flex justify-between items-center">
           <div className="flex items-center">
             <div className="animate-float">
               {getWeatherIcon(weatherData.icon, weatherData.condition)}
             </div>
-            <div className="ml-3">
-              <div className="text-sm text-muted-foreground">{weatherData.location}</div>
+            <div className="ml-2">
+              <div className="text-xs text-muted-foreground">{weatherData.location}</div>
               <div className="flex items-center animate-fade-in" style={{animationDelay: "0.2s"}}>
-                <WiThermometer className="h-6 w-6" />
-                <span className="text-2xl font-bold">{weatherData.temperature}°C</span>
+                <WiThermometer className="h-5 w-5" />
+                <span className="text-xl font-bold">{weatherData.temperature}°C</span>
               </div>
-              <div className="text-xs text-muted-foreground mt-1 animate-fade-in" style={{animationDelay: "0.3s"}}>
+              <div className="text-2xs text-muted-foreground animate-fade-in" style={{animationDelay: "0.3s"}}>
                 Feels like {weatherData.feelsLike}°C
               </div>
             </div>
           </div>
           
           <div className="flex flex-col">
-            <div className="flex items-center mb-2 animate-fade-in" style={{animationDelay: "0.2s"}}>
-              <WiRaindrop className={`h-6 w-6 ${getRainChanceColor(weatherData.rainChance)} animate-pulse`} />
-              <span className={`text-sm ml-1 ${getRainChanceColor(weatherData.rainChance)}`}>
-                {weatherData.rainChance}% chance
+            <div className="flex items-center mb-1 animate-fade-in" style={{animationDelay: "0.2s"}}>
+              <WiRaindrop className={`h-5 w-5 ${getRainChanceColor(weatherData.rainChance)} animate-pulse`} />
+              <span className={`text-xs ml-1 ${getRainChanceColor(weatherData.rainChance)}`}>
+                {weatherData.rainChance}%
               </span>
             </div>
-            <div className="flex items-center mb-2 animate-fade-in" style={{animationDelay: "0.3s"}}>
-              <WiHumidity className="h-6 w-6 text-blue-400" />
-              <span className="text-sm ml-1">{weatherData.humidity}% humidity</span>
+            <div className="flex items-center mb-1 animate-fade-in" style={{animationDelay: "0.3s"}}>
+              <WiHumidity className="h-5 w-5 text-blue-400" />
+              <span className="text-xs ml-1">{weatherData.humidity}%</span>
             </div>
             <div className="flex items-center animate-fade-in" style={{animationDelay: "0.4s"}}>
-              <WiStrongWind className="h-6 w-6 text-gray-400 animate-pulse" />
-              <span className="text-sm ml-1">{weatherData.wind} m/s</span>
+              <WiStrongWind className="h-5 w-5 text-gray-400 animate-pulse" />
+              <span className="text-xs ml-1">{weatherData.wind} m/s</span>
             </div>
           </div>
         </div>
