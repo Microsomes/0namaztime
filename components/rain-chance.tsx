@@ -56,9 +56,9 @@ export function RainChance({ rainChance, likelyRainTime }: RainChanceProps) {
               {getMessage()}
             </div>
             {rainChance >= 30 && (
-              <div className="flex items-center justify-center mt-1 text-2xs text-muted-foreground animate-fade-in" style={{animationDelay: "0.6s"}}>
+              <div className="flex items-center justify-center mt-1 text-xs text-muted-foreground animate-fade-in" style={{animationDelay: "0.6s"}}>
                 <WiTime4 className="h-3 w-3 mr-1" />
-                {likelyRainTime}
+                <span className="text-3xl">{likelyRainTime}</span>
               </div>
             )}
           </div>
