@@ -93,8 +93,15 @@ export function PrayerCard({ name, time, isCurrent, isNext }: PrayerCardProps) {
     return () => unsubscribe()
   }, [])
 
+  const animationClass = isCurrent ? "animate-scale-in animate-glow prayer-card" : 
+                        isNext ? "animate-from-right prayer-card" : 
+                        "animate-fade-in prayer-card";
+                        
+  // Special animation for current prayer
+  const currentClass = isCurrent ? "current-prayer-highlight" : "";
+
   return (
-    <Card className={`overflow-hidden ${borderClass} ${cardSize === "large" ? "col-span-2" : ""}`}>
+    <Card className={`overflow-hidden ${borderClass} ${animationClass} ${currentClass}`}>
       <CardContent className="p-0">
         <div className={`p-2 ${headerClass} flex justify-between items-center`}>
           <h3 className={`font-medium text-center flex-1 ${cardSize === "large" ? "text-lg" : ""}`}>{name}</h3>
@@ -103,7 +110,7 @@ export function PrayerCard({ name, time, isCurrent, isNext }: PrayerCardProps) {
               {isPlaying ? (
                 <button
                   onClick={stopAdhan}
-                  className="p-1 rounded-full hover:bg-white/20 transition-colors mr-1"
+                  className="p-1 rounded-full hover:bg-white/20 transition-colors mr-1 animate-pulse"
                   aria-label="Stop adhan"
                 >
                   <Square className="h-4 w-4" />
@@ -116,7 +123,7 @@ export function PrayerCard({ name, time, isCurrent, isNext }: PrayerCardProps) {
                   disabled={isPlaying}
                 >
                   {playError ? (
-                    <AlertCircle className="h-4 w-4 text-red-500" />
+                    <AlertCircle className="h-4 w-4 text-red-500 animate-pulse" />
                   ) : (
                     <Play className="h-4 w-4" />
                   )}
@@ -136,10 +143,10 @@ export function PrayerCard({ name, time, isCurrent, isNext }: PrayerCardProps) {
           <span className={`font-bold ${cardSize === "large" ? "text-4xl" : "text-xl"}`}>{time}</span>
         </div>
         {isCurrent && (
-          <div className="bg-amber-600/20 text-amber-600 text-xs text-center py-1 font-medium">Current</div>
+          <div className="bg-amber-600/20 text-amber-600 text-xs text-center py-1 font-medium animate-pulse">Current</div>
         )}
         {isNext && !isCurrent && (
-          <div className="bg-primary/20 text-primary text-xs text-center py-1 font-medium">Next</div>
+          <div className="bg-primary/20 text-primary text-xs text-center py-1 font-medium animate-shimmer">Next</div>
         )}
       </CardContent>
     </Card>

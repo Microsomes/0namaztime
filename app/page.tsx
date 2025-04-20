@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from "react"
 import { format } from "date-fns"
-import { Calendar, Clock, Moon, RefreshCw, Sun, Volume2, Maximize, Minimize } from "lucide-react"
+import { Calendar, Clock, Moon, RefreshCw, Sun, Volume2, Maximize, Minimize, Cloud, CloudRain } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useTheme } from "next-themes"
 import { getBirminghamCentralMosqueTimes, type CombinedPrayerTimes } from "./actions/get-prayer-times"
+import { fetchWeather, type WeatherData } from "./actions/fetch-weather"
 import { AdhanPermission } from "@/components/adhan-permission"
 import { PrayerCard } from "@/components/prayer-card"
+import { WeatherCard } from "@/components/weather-card"
+import { RainChance } from "@/components/rain-chance" 
 import adhanService from "@/services/adhan-service"
 import { useToast } from "@/components/ui/use-toast"
 import moment from "moment-hijri"
@@ -21,9 +24,12 @@ interface Prayer {
 
 export default function Home() {
   const [prayerTimes, setPrayerTimes] = useState<CombinedPrayerTimes | null>(null)
+  const [weatherData, setWeatherData] = useState<WeatherData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [weatherLoading, setWeatherLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [weatherError, setWeatherError] = useState<string | null>(null)
   const [currentTime, setCurrentTime] = useState(new Date())
   const [adhanPermission, setAdhanPermission] = useState<"unknown" | "granted" | "denied">("unknown")
   const [testingAdhan, setTestingAdhan] = useState(false)
@@ -43,9 +49,11 @@ export default function Home() {
       }
 
       setPrayerTimes(times)
-      setLastUpdated(new Date())
+      const now = new Date()
+      setLastUpdated(now)
       localStorage.setItem("prayerTimes", JSON.stringify(times))
-      localStorage.setItem("lastUpdated", new Date().toISOString().split("T")[0])
+      localStorage.setItem("lastUpdated", now.toISOString().split("T")[0])
+      localStorage.setItem("lastUpdatedTime", now.toISOString())
     } catch (err) {
       console.error("Error fetching prayer times:", err)
       setError("Could not load prayer times. Please check your connection and try again.")
@@ -57,6 +65,32 @@ export default function Home() {
       }
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchWeatherData = async () => {
+    setWeatherLoading(true)
+    setWeatherError(null)
+    try {
+      const data = await fetchWeather()
+      if (data) {
+        setWeatherData(data)
+        localStorage.setItem("weatherData", JSON.stringify(data))
+        localStorage.setItem("weatherLastUpdated", new Date().toISOString())
+      } else {
+        setWeatherError("Could not fetch weather data")
+      }
+    } catch (err) {
+      console.error("Error fetching weather:", err)
+      setWeatherError("Error fetching weather data")
+      
+      // Try to load from cache
+      const cachedWeather = localStorage.getItem("weatherData")
+      if (cachedWeather) {
+        setWeatherData(JSON.parse(cachedWeather))
+      }
+    } finally {
+      setWeatherLoading(false)
     }
   }
 
@@ -78,18 +112,57 @@ export default function Home() {
         fetchPrayerTimes()
       }
     }
+    
+    // Check if we need to fetch or load weather data
+    const weatherLastUpdated = localStorage.getItem("weatherLastUpdated")
+    if (!weatherLastUpdated || new Date().getTime() - new Date(weatherLastUpdated).getTime() > 30 * 60 * 1000) {
+      // If weather data is older than 30 minutes, fetch new data
+      fetchWeatherData()
+    } else {
+      // Load cached weather data
+      const cachedWeather = localStorage.getItem("weatherData")
+      if (cachedWeather) {
+        setWeatherData(JSON.parse(cachedWeather))
+        setWeatherLoading(false)
+      } else {
+        fetchWeatherData()
+      }
+    }
 
-    // Set up a timer to check for date change every minute
+    // Set up a timer to check for date change and hourly refresh every minute
     const dateCheckInterval = setInterval(() => {
-      const currentDate = new Date().toISOString().split("T")[0]
+      const now = new Date()
+      const currentDate = now.toISOString().split("T")[0]
       const lastSavedDate = localStorage.getItem("lastUpdated")
-
-      if (lastSavedDate !== currentDate) {
+      const currentMinute = now.getMinutes()
+      
+      // Refresh prayer times in three cases:
+      // 1. Date changed
+      // 2. Hourly refresh (when minutes = 0)
+      // 3. If last update was more than 1 hour ago
+      if (lastSavedDate !== currentDate || currentMinute === 0) {
+        console.log("Auto-refreshing prayer times (hourly or date change)")
         fetchPrayerTimes()
+      } else {
+        // Check if last update was more than an hour ago
+        const lastUpdatedTime = localStorage.getItem("lastUpdatedTime")
+        if (lastUpdatedTime) {
+          const timeSinceUpdate = now.getTime() - new Date(lastUpdatedTime).getTime()
+          if (timeSinceUpdate > 60 * 60 * 1000) { // More than one hour
+            console.log("Auto-refreshing prayer times (more than 1 hour since last update)")
+            fetchPrayerTimes()
+          }
+        }
+      }
+      
+      // Check if weather data needs to be refreshed (every 30 minutes)
+      const weatherLastUpdated = localStorage.getItem("weatherLastUpdated")
+      if (!weatherLastUpdated || now.getTime() - new Date(weatherLastUpdated).getTime() > 30 * 60 * 1000) {
+        fetchWeatherData()
       }
 
       // Update current time every minute for countdown
-      setCurrentTime(new Date())
+      setCurrentTime(now)
     }, 60000)
 
     // Update current time every second for more accurate countdown
@@ -103,41 +176,111 @@ export default function Home() {
     }
   }, [])
 
-  // Check if it's time to play adhan
-  useEffect(() => {
-    if (adhanPermission !== "granted" || !prayerTimes) return
-
-    const prayers = getPrayerTimesArray()
-    const now = new Date()
-    const currentHour = now.getHours()
-    const currentMinute = now.getMinutes()
-    const currentSeconds = now.getSeconds()
-
-    // Only check in the first 5 seconds of each minute to avoid multiple triggers
-    if (currentSeconds > 5) return
-
-    // Check each prayer time
-    for (const prayer of prayers) {
-      if (!prayer.time || prayer.time === "N/A") continue
-
-      // Extract hours and minutes from prayer time
-      const [prayerHour, prayerMinute] = getHoursMinutes(prayer.time)
-
-      // Check if it's exactly prayer time
-      if (currentHour === prayerHour && currentMinute === prayerMinute) {
-        // Check if adhan is not already playing to avoid multiple plays
-        if (!adhanService.isPlaying()) {
-          console.log(`Prayer time: ${prayer.name} - Playing adhan automatically`)
-          adhanService.playAdhan(prayer.name)
-          
-          toast({
-            title: "Prayer Time",
-            description: `It's time for ${prayer.name} prayer.`,
-          })
-        }
-        break
-      }
+  // Function to calculate time remaining until next prayer in milliseconds
+  const getMillisecondsUntilNextPrayer = (nextPrayerObj: Prayer | null): number => {
+    if (!nextPrayerObj || !prayerTimes) return Infinity;
+    
+    // Get current time in minutes
+    const now = new Date();
+    const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+    
+    // Calculate minutes until next prayer
+    let minutesUntilNext = nextPrayerObj.minutes - currentTimeInMinutes;
+    
+    // If next prayer is tomorrow
+    if (minutesUntilNext < 0) {
+      minutesUntilNext += 24 * 60; // Add 24 hours
     }
+    
+    // Convert to milliseconds
+    return minutesUntilNext * 60 * 1000;
+  };
+
+  // Effects for playing adhan
+  useEffect(() => {
+    if (adhanPermission !== "granted" || !prayerTimes) return;
+    
+    // APPROACH 1: Check every minute (traditional way)
+    const checkPrayerTimes = () => {
+      const prayers = getPrayerTimesArray();
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      const currentSeconds = now.getSeconds();
+    
+      // Only check in the first 5 seconds of each minute to avoid multiple triggers
+      if (currentSeconds > 5) return;
+    
+      // Check each prayer time
+      for (const prayer of prayers) {
+        if (!prayer.time || prayer.time === "N/A") continue;
+    
+        // Extract hours and minutes from prayer time
+        const [prayerHour, prayerMinute] = getHoursMinutes(prayer.time);
+    
+        // Check if it's exactly prayer time
+        if (currentHour === prayerHour && currentMinute === prayerMinute) {
+          // Check if adhan is not already playing to avoid multiple plays
+          if (!adhanService.isPlaying()) {
+            console.log(`Prayer time: ${prayer.name} - Playing adhan automatically (regular check)`);
+            adhanService.playAdhan(prayer.name);
+            
+            toast({
+              title: "Prayer Time",
+              description: `It's time for ${prayer.name} prayer.`,
+            });
+          }
+          break;
+        }
+      }
+    };
+    
+    // Run the check on component load and every minute
+    checkPrayerTimes();
+    const minuteInterval = setInterval(checkPrayerTimes, 60000);
+    
+    // APPROACH 2: Precise timer for next prayer
+    const setupNextPrayerTimer = () => {
+      // Get the current nextPrayer from the prayer times
+      const { next: currentNextPrayer } = getCurrentAndNextPrayer();
+      if (!currentNextPrayer) return undefined;
+      
+      const timeUntilNextPrayer = getMillisecondsUntilNextPrayer(currentNextPrayer);
+      
+      // If the next prayer is very close (less than 60 seconds away)
+      if (timeUntilNextPrayer < 60000) {
+        console.log(`Next prayer (${currentNextPrayer.name}) is in ${Math.round(timeUntilNextPrayer/1000)} seconds - setting up precise timer`);
+        
+        // Set a precise timer to play adhan exactly at prayer time
+        const nextPrayerTimer = setTimeout(() => {
+          if (!adhanService.isPlaying()) {
+            console.log(`Prayer time: ${currentNextPrayer.name} - Playing adhan automatically (precise timer)`);
+            adhanService.playAdhan(currentNextPrayer.name);
+            
+            toast({
+              title: "Prayer Time",
+              description: `It's time for ${currentNextPrayer.name} prayer.`,
+            });
+          }
+        }, timeUntilNextPrayer);
+        
+        return () => clearTimeout(nextPrayerTimer);
+      }
+      return undefined;
+    };
+    
+    // Setup the timer and create the cleanup function
+    const cleanupTimer = setupNextPrayerTimer();
+    
+    // Run the precise timer setup every 15 seconds to catch upcoming prayers
+    const timerCheckInterval = setInterval(setupNextPrayerTimer, 15000);
+    
+    // Clean up all timers
+    return () => {
+      clearInterval(minuteInterval);
+      clearInterval(timerCheckInterval);
+      if (cleanupTimer) cleanupTimer();
+    };
   }, [currentTime, prayerTimes, adhanPermission, toast])
 
   const getHoursMinutes = (timeStr: string): [number, number] => {
@@ -320,6 +463,17 @@ export default function Home() {
       return `${minutes}m ${seconds}s`
     }
   }
+  
+  // Initialize currentPrayer and nextPrayer for dependency resolution
+  const [currentPrayer, setCurrentPrayer] = useState<Prayer | null>(null);
+  const [nextPrayer, setNextPrayer] = useState<Prayer | null>(null);
+  
+  // Update prayer states when time changes
+  useEffect(() => {
+    const { current, next } = getCurrentAndNextPrayer();
+    setCurrentPrayer(current);
+    setNextPrayer(next);
+  }, [currentTime, prayerTimes]);
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark")
@@ -381,13 +535,14 @@ export default function Home() {
     }
   }
 
-  const { current: currentPrayer, next: nextPrayer } = getCurrentAndNextPrayer()
+  // Prayer times calculated in useEffect now
 
   // Get the Hijri date using moment-hijri
   const hijriDate = moment().format('iDD iMMMM iYYYY');
   
+  
   return (
-    <main className="flex min-h-screen flex-col items-center p-4 bg-background">
+    <main className="flex min-h-screen flex-col items-center p-4 bg-background animate-fade-in">
       <AdhanPermission
         onPermissionGranted={handleAdhanPermissionGranted}
         onPermissionDenied={handleAdhanPermissionDenied}
@@ -444,16 +599,16 @@ export default function Home() {
         )}
 
         {nextPrayer && (
-          <Card className="mb-4 border-primary">
-            <CardContent className="p-4">
+          <Card className="mb-4 border-primary animate-scale-in">
+            <CardContent className="p-4 animate-shimmer">
               <div className="flex justify-between items-center">
-                <div>
+                <div className="animate-fade-in" style={{animationDelay: "0.1s"}}>
                   <h3 className="text-lg font-medium text-foreground">Next Prayer</h3>
                   <p className="text-2xl font-bold text-primary">{nextPrayer.name}</p>
                 </div>
-                <div className="text-right">
+                <div className="text-right animate-fade-in" style={{animationDelay: "0.2s"}}>
                   <p className="text-sm text-muted-foreground">Time until</p>
-                  <p className="text-2xl font-bold text-primary">{getTimeUntilNextPrayer()}</p>
+                  <p className="text-2xl font-bold text-primary animate-pulse">{getTimeUntilNextPrayer()}</p>
                 </div>
               </div>
             </CardContent>
@@ -466,6 +621,28 @@ export default function Home() {
           </div>
         )}
 
+        {/* Weather Card - Above prayer times */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+          <div className="lg:col-span-3">
+            {weatherLoading ? (
+              <div className="flex justify-center items-center h-20">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+              </div>
+            ) : weatherData ? (
+              <WeatherCard weatherData={weatherData} />
+            ) : (
+              <Card>
+                <CardContent className="p-4 flex items-center justify-center">
+                  <Cloud className="h-5 w-5 mr-2 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Weather data unavailable</span>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+          
+          
+        </div>
+
         {loading ? (
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -473,103 +650,106 @@ export default function Home() {
         ) : (
           prayerTimes && (
             <div className="flex flex-col gap-4">
-              {/* Current Prayer - Full Width */}
-              {currentPrayer && (
-                <div className="w-full">
-                  {currentPrayer.name === "Fajr" || currentPrayer.name === "Fajr (Yesterday)" ? (
-                    <PrayerCard
-                      name="Fajr"
-                      time={formatTime(prayerTimes.Fajr)}
-                      isCurrent={true}
-                      isNext={false}
-                    />
-                  ) : currentPrayer.name === "Sunrise" ? (
-                    <PrayerCard
-                      name="Sunrise"
-                      time={formatTime(prayerTimes.Sunrise)}
-                      isCurrent={true}
-                      isNext={false}
-                    />
-                  ) : currentPrayer.name === "Dhuhr" ? (
-                    <PrayerCard
-                      name="Dhuhr"
-                      time={formatTime(prayerTimes.Zuhr)}
-                      isCurrent={true}
-                      isNext={false}
-                    />
-                  ) : currentPrayer.name === "Asr" ? (
-                    <PrayerCard
-                      name="Asr"
-                      time={formatTime(prayerTimes.Asr)}
-                      isCurrent={true}
-                      isNext={false}
-                    />
-                  ) : currentPrayer.name === "Maghrib" ? (
-                    <PrayerCard
-                      name="Maghrib"
-                      time={formatTime(prayerTimes.Maghrib)}
-                      isCurrent={true}
-                      isNext={false}
-                    />
-                  ) : (
-                    <PrayerCard
-                      name="Isha"
-                      time={formatTime(prayerTimes.Isha)}
-                      isCurrent={true}
-                      isNext={false}
-                    />
-                  )}
-                </div>
-              )}
-              
-              {/* Next Prayer - Full Width */}
-              {nextPrayer && (
-                <div className="w-full">
-                  {nextPrayer.name === "Fajr" || nextPrayer.name === "Fajr (Tomorrow)" ? (
-                    <PrayerCard
-                      name="Fajr"
-                      time={formatTime(prayerTimes.Fajr)}
-                      isCurrent={false}
-                      isNext={true}
-                    />
-                  ) : nextPrayer.name === "Sunrise" ? (
-                    <PrayerCard
-                      name="Sunrise"
-                      time={formatTime(prayerTimes.Sunrise)}
-                      isCurrent={false}
-                      isNext={true}
-                    />
-                  ) : nextPrayer.name === "Dhuhr" ? (
-                    <PrayerCard
-                      name="Dhuhr"
-                      time={formatTime(prayerTimes.Zuhr)}
-                      isCurrent={false}
-                      isNext={true}
-                    />
-                  ) : nextPrayer.name === "Asr" ? (
-                    <PrayerCard
-                      name="Asr"
-                      time={formatTime(prayerTimes.Asr)}
-                      isCurrent={false}
-                      isNext={true}
-                    />
-                  ) : nextPrayer.name === "Maghrib" ? (
-                    <PrayerCard
-                      name="Maghrib"
-                      time={formatTime(prayerTimes.Maghrib)}
-                      isCurrent={false}
-                      isNext={true}
-                    />
-                  ) : (
-                    <PrayerCard
-                      name="Isha"
-                      time={formatTime(prayerTimes.Isha)}
-                      isCurrent={false}
-                      isNext={true}
-                    />
-                  )}
-                </div>
-              )}
+              {/* Current and Next Prayers - Side by Side */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Current Prayer */}
+                {currentPrayer && (
+                  <div className="w-full">
+                    {currentPrayer.name === "Fajr" || currentPrayer.name === "Fajr (Yesterday)" ? (
+                      <PrayerCard
+                        name="Fajr"
+                        time={formatTime(prayerTimes.Fajr)}
+                        isCurrent={true}
+                        isNext={false}
+                      />
+                    ) : currentPrayer.name === "Sunrise" ? (
+                      <PrayerCard
+                        name="Sunrise"
+                        time={formatTime(prayerTimes.Sunrise)}
+                        isCurrent={true}
+                        isNext={false}
+                      />
+                    ) : currentPrayer.name === "Dhuhr" ? (
+                      <PrayerCard
+                        name="Dhuhr"
+                        time={formatTime(prayerTimes.Zuhr)}
+                        isCurrent={true}
+                        isNext={false}
+                      />
+                    ) : currentPrayer.name === "Asr" ? (
+                      <PrayerCard
+                        name="Asr"
+                        time={formatTime(prayerTimes.Asr)}
+                        isCurrent={true}
+                        isNext={false}
+                      />
+                    ) : currentPrayer.name === "Maghrib" ? (
+                      <PrayerCard
+                        name="Maghrib"
+                        time={formatTime(prayerTimes.Maghrib)}
+                        isCurrent={true}
+                        isNext={false}
+                      />
+                    ) : (
+                      <PrayerCard
+                        name="Isha"
+                        time={formatTime(prayerTimes.Isha)}
+                        isCurrent={true}
+                        isNext={false}
+                      />
+                    )}
+                  </div>
+                )}
+                
+                {/* Next Prayer */}
+                {nextPrayer && (
+                  <div className="w-full">
+                    {nextPrayer.name === "Fajr" || nextPrayer.name === "Fajr (Tomorrow)" ? (
+                      <PrayerCard
+                        name="Fajr"
+                        time={formatTime(prayerTimes.Fajr)}
+                        isCurrent={false}
+                        isNext={true}
+                      />
+                    ) : nextPrayer.name === "Sunrise" ? (
+                      <PrayerCard
+                        name="Sunrise"
+                        time={formatTime(prayerTimes.Sunrise)}
+                        isCurrent={false}
+                        isNext={true}
+                      />
+                    ) : nextPrayer.name === "Dhuhr" ? (
+                      <PrayerCard
+                        name="Dhuhr"
+                        time={formatTime(prayerTimes.Zuhr)}
+                        isCurrent={false}
+                        isNext={true}
+                      />
+                    ) : nextPrayer.name === "Asr" ? (
+                      <PrayerCard
+                        name="Asr"
+                        time={formatTime(prayerTimes.Asr)}
+                        isCurrent={false}
+                        isNext={true}
+                      />
+                    ) : nextPrayer.name === "Maghrib" ? (
+                      <PrayerCard
+                        name="Maghrib"
+                        time={formatTime(prayerTimes.Maghrib)}
+                        isCurrent={false}
+                        isNext={true}
+                      />
+                    ) : (
+                      <PrayerCard
+                        name="Isha"
+                        time={formatTime(prayerTimes.Isha)}
+                        isCurrent={false}
+                        isNext={true}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
               
               {/* Remaining Prayers - Grid Layout */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -634,9 +814,10 @@ export default function Home() {
         )}
 
         {lastUpdated && (
-          <div className="text-xs text-muted-foreground mt-4 text-center flex items-center justify-center">
+          <div className="text-xs text-muted-foreground mt-4 text-center flex items-center justify-center animate-fade-in">
             <Clock className="h-3 w-3 mr-1" />
-            Last updated: {format(lastUpdated, "HH:mm")}
+            Last updated: {format(lastUpdated, "HH:mm")} 
+            <span className="ml-1 opacity-70">(auto-refreshes hourly)</span>
           </div>
         )}
       </div>
